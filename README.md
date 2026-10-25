@@ -1,0 +1,175 @@
+# Interface Palang Parkir Pintu Masuk (ESP32)
+
+Firmware siap upload untuk **ESP32 DevKit (ESP32-WROOM-32)** sebagai interface palang parkir
+pintu masuk. Membaca loop detector (VLD) mobil/motor, tombol tiket, tombol bantuan, kartu member
+(reader Wiegand), dan status palang, lalu mengirim data ke server lewat WiFi. Server membuka
+palang dengan memanggil `http://IP-ESP32/open-gate?sn=SN` (relay aktif 1 detik). Suara lewat
+modul Serial MP3 Player v1.1 (YX5300) + ampli PAM8403. Setting dan log lewat Bluetooth (BLE).
+
+Versi firmware: lihat [`firmware/VERSI.txt`](firmware/VERSI.txt). Versi yang terpasang tampil
+sebagai `FIRMWARE:` di log saat boot dan di perintah `status`.
+
+## Isi folder
+
+| Folder / file | Isi |
+|---------------|-----|
+| `upload.sh` | Upload firmware dari Linux / macOS |
+| `upload.bat` | Upload firmware dari Windows |
+| `firmware/` | File firmware (`*.bin`) dan `VERSI.txt` |
+| `sdcard/01/` | File suara `001.mp3` ... `009.mp3` untuk kartu SD modul MP3 |
+| `tools/` | esptool untuk Linux 64-bit (dipakai otomatis oleh `upload.sh`) |
+
+## Upload firmware
+
+Tidak perlu Arduino IDE. Yang dibutuhkan hanya kabel USB **data** (kabel yang hanya untuk
+charge tidak bisa dipakai).
+
+### Linux
+
+Colokkan ESP32, buka terminal di folder ini, lalu jalankan:
+
+```
+bash upload.sh
+```
+
+Tunggu sampai muncul `SELESAI`, ESP32 restart sendiri. Tidak perlu memasang apa pun.
+Jika muncul `Tidak punya izin ke /dev/ttyUSB0`, jalankan sekali
+`sudo usermod -aG dialout $USER`, lalu logout dan login lagi.
+
+### Windows
+
+1. Sekali saja: pasang Python dari https://www.python.org (centang **Add Python to PATH**),
+   lalu buka Command Prompt dan jalankan `pip install esptool`.
+2. Colokkan ESP32. Jika di Device Manager tidak muncul `Silicon Labs CP210x (COMx)`,
+   pasang driver CP210x dari situs Silicon Labs.
+3. Klik dua kali `upload.bat`, tunggu sampai muncul `SELESAI`.
+
+### macOS
+
+Sekali saja `pip3 install esptool`, lalu di Terminal: `bash upload.sh`.
+
+### Pilihan upload
+
+| Perintah | Kegunaan |
+|----------|----------|
+| `bash upload.sh` | Update firmware. Setting WiFi, server, dan PIN Bluetooth **tetap**. |
+| `bash upload.sh --erase` | ESP32 **baru** / reset total. Semua setting terhapus, PIN kembali `123456`. |
+| `bash upload.sh /dev/ttyUSB1` | Pilih port jika ada lebih dari satu. Windows: `upload.bat COM5`. |
+| `BAUD=115200 bash upload.sh` | Upload sering gagal di tengah jalan. Windows: `set BAUD=115200` lalu `upload.bat`. |
+
+### Jika gagal
+
+| Pesan | Solusi |
+|-------|--------|
+| `ESP32 tidak terdeteksi` | Ganti kabel USB (harus kabel data), coba port USB lain. |
+| `Failed to connect` / `No serial data received` | Tahan tombol **BOOT** di ESP32 saat upload, lepas setelah muncul `Writing`. |
+| `This chip is ESP32-S3, not ESP32` (atau chip lain) | Board salah, firmware ini hanya untuk ESP32-WROOM-32. |
+| `esptool tidak ditemukan` | `pip install esptool`. |
+| Gagal saat `Writing` | Ulangi dengan `BAUD=115200`. |
+| Karakter aneh `����` di Serial Monitor sesaat setelah restart | Normal, abaikan. |
+
+## Setting pertama (Bluetooth)
+
+Bluetooth (BLE) selalu aktif dan dilindungi PIN pairing 6 angka (awal `123456`).
+
+1. Di HP buka aplikasi **Serial Bluetooth Terminal** (mode BLE), sambungkan ke
+   `HYBRID-INTERFACE`, lalu masukkan PIN.
+2. Kirim satu baris, akhiri dengan Enter:
+
+   ```
+   ssid;password;domain;apikey;pin
+   ```
+
+   Contoh: `ParkirWiFi;rahasia123;192.168.1.10:3000;APIKEY_DARI_SERVER;482913`
+
+   - `domain` = alamat server, boleh tanpa `http://`.
+   - `pin` = PIN Bluetooth baru (6 angka). Kosong (`...;apikey;`) atau tidak ditulis = PIN tidak diubah.
+   - SSID dan password tidak boleh mengandung tanda `;`.
+3. ESP32 menyimpan setting lalu restart. Jika PIN diganti, hapus `HYBRID-INTERFACE` dari
+   daftar Bluetooth HP, lalu pairing ulang dengan PIN baru.
+4. Ketik `status`. Baris `WIFI:` harus menampilkan IP, dan `SERVER:` harus `OK`.
+
+**Wajib ganti PIN dari `123456`.** Siapa pun yang tahu PIN bisa mengubah setting dan membuka
+palang lewat Bluetooth. Jika lupa PIN, sambungkan USB, lalu di Serial Monitor (115200)
+ketik `pin 654321`.
+
+## Pin ESP32
+
+Semua input aktif LOW (0 V saat aktif).
+
+| GPIO | Fungsi | Sambungan |
+|------|--------|-----------|
+| 2   | Relay palang | IN modul relay 5V (jumper **H**). HIGH = buka (pulsa 1 detik). Resistor 10k dari GPIO2 ke GND. |
+| 4   | VLD mobil | OUT2 modul opto 4 channel 12V |
+| 5   | VLD motor | OUT3 modul opto |
+| 15  | Status palang | OUT1 modul opto. LOW = palang tertutup |
+| 25  | Tombol tiket | tombol ke GND, pull-up 4k7 ke 3V3, resistor 330 Ω seri, kapasitor 100 nF ke GND |
+| 26  | Tombol bantuan | sama dengan tombol tiket |
+| 21  | Wiegand D0 | dioda Schottky BAT85 (katoda ke kabel reader, anoda ke GPIO), pull-up 4k7 ke 3V3, kapasitor 1 nF ke GND |
+| 22  | Wiegand D1 | sama dengan D0 |
+| 17  | Audio TX → RX modul MP3 | lewat resistor 1k seri |
+| 18  | Audio RX ← TX modul MP3 | TX modul → 1k → GPIO18, lalu GPIO18 → 2k2 → GND |
+| 3V3 | VCC sisi output modul opto | **bukan** 5V |
+
+Jangan dipakai: GPIO 1/3 (USB serial), 6–11 (flash), 0/12 (strapping boot), 34–39 (input
+saja, tanpa pull-up).
+
+**Reader kartu:** set ke **Wiegand 34** (kabel abu-abu ke GND) agar nomor kartu utuh dan
+sama dengan reader USB. Wiegand 26 tetap terbaca, tapi byte teratas nomor kartu hilang.
+
+### Daya
+
+- PSU 12V 3A → sekring 3A → terminal +12V (TVS SMBJ15A + elco 470 µF ke GND).
+- Buck A LM2596 diset 5,0 V → pin 5V ESP32 + DC+ modul relay.
+- Buck B LM2596 diset 5,0 V → filter LC (100 µH + 1000 µF + 100 nF) → modul MP3 + ampli.
+- +12V langsung → reader, sisi input modul opto, COM kontak barrier, dan relay VLD.
+- Semua GND ke satu terminal GND (ground bintang).
+
+### Modul opto dan kabel barrier
+
+- Modul opto: +12V → COM kontak → NO/NC kontak → IN1/IN2/IN3; G/- sisi input → GND.
+  Kontak tersambung → OUT = LOW.
+- Kabel ke barrier (UTP/FTP Cat5e, ±3 m): pasangan 1 = status palang (+12V dan IN1),
+  pasangan 2 = relay COM/NO ke input OPEN barrier. Shield ke GND di sisi kotak saja.
+
+### Anti-noise
+
+- Modul MP3: VCC dari buck terpisah + filter LC, elco 470–1000 µF + 100 nF dekat modul.
+  Volume modul maksimum, gain ampli rendah. Kabel audio jauh dari kabel relay / loop.
+- Reader: GND reader wajib sama dengan GND ESP32, kabel twisted / shielded. Jangan pakai
+  pembagi 1k/2k2 di D0/D1.
+- Firmware sudah memfilter: pulsa Wiegand < 15 µs / > 500 µs dibuang, VLD harus stabil
+  200 ms (datang) / 500 ms (pergi), tombol 50 ms, status palang 100 ms.
+- Jika karakter rusak `����` muncul di Serial Monitor saat alat sedang jalan, cek ground
+  antara USB laptop dan PSU 12V. Di lapangan pantau log lewat Bluetooth.
+
+## Kartu SD (modul MP3)
+
+Format kartu SD **FAT32**, lalu salin folder `sdcard/01` ke root kartu, sehingga isinya
+`01/001.mp3` ... `01/009.mp3`. Nama folder harus persis `01`.
+
+| Kode | Suara | Kapan diputar |
+|------|-------|---------------|
+| 0001 | Sistem siap | WiFi dan server tersambung (boot / pulih) |
+| 0002 | Bantuan | tombol bantuan ditekan |
+| 0003 | Selamat datang | kendaraan datang dan palang tertutup; diulang (jeda 2 detik) sampai tombol tiket ditekan / kartu di-tap |
+| 0004 | Antrian | kendaraan datang saat palang belum tertutup |
+| 0005 | Kartu tidak terdaftar | jawaban server |
+| 0006 | Member masih di area | jawaban server |
+| 0007 | Langganan habis | jawaban server |
+| 0008 | Silakan masuk | palang dibuka; diulang (jeda 2 detik) sampai kendaraan lewat |
+| 0009 | Koneksi terputus | WiFi / server putus, atau server tidak menjawab |
+
+## Perintah Serial / Bluetooth
+
+Perintah yang sama berlaku di Serial Monitor (USB, 115200 baud, akhiran newline) dan di
+aplikasi Bluetooth. Selama HP terhubung, semua log tampil di aplikasi.
+
+| Perintah | Fungsi |
+|----------|--------|
+| `status` | versi firmware, status input, palang, WiFi, server |
+| `cek audio` | status modul MP3 dan jumlah file di kartu SD (harus 9) |
+| `tes uart` | uji UART audio (jumper GPIO17-GPIO18, modul MP3 dilepas) |
+| `play 0001` ... `play 0009` | putar suara |
+| `open gate` | buka palang (tes relay) |
+| `pin 123456` | ganti PIN Bluetooth (HP harus pairing ulang) |

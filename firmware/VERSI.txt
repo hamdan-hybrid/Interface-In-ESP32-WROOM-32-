@@ -1,0 +1,18 @@
+Firmware : parkir-mp3-reader
+Versi    : 2026.10.25
+Build    : 2026-10-25 21:57
+Board    : ESP32 DevKit (ESP32-WROOM-32, flash 4 MB)
+FQBN     : esp32:esp32:esp32:PartitionScheme=huge_app
+Core     : esp32 3.3.12
+
+Alamat flash:
+  0x1000  bootloader.bin
+  0x8000  partitions.bin
+  0xe000  boot_app0.bin
+  0x10000 firmware.bin
+
+SHA256:
+47bbbfca119fe87190f63a67af9d85adff6433bcf3812ec92a9b9c9416a53ad1  bootloader.bin
+aaae2888c5a6a348004b5b436f47abb25ae32e72d9003902955a998eda723edd  partitions.bin
+f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0  boot_app0.bin
+88e28d2361890b8968c6aac24240d66c5668a69b04f4897b64a5eb0ddbaeaa38  firmware.bin
