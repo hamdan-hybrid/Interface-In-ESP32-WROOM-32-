@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Upload firmware parkir-mp3-reader ke ESP32 DevKit (ESP32-WROOM-32).
+# Upload firmware parkir-mp3-reader ke ESP32 DevKit (ESP32-WROOM-32),
+# dari komputer Linux 64-bit (x86_64). Tidak perlu memasang apa pun.
 #
 #   bash upload.sh                  port dicari otomatis, setting WiFi/PIN tetap
 #   bash upload.sh /dev/ttyUSB1     pilih port sendiri
 #   bash upload.sh --erase          hapus semua dulu (ESP32 baru / reset setting)
-#   BAUD=115200 bash upload.sh      jika upload gagal di tengah jalan
+#   BAUD=115200 bash upload.sh      langsung pelan (gagal di baud tinggi diulang otomatis)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -28,38 +29,25 @@ for f in bootloader.bin partitions.bin boot_app0.bin firmware.bin; do
     fi
 done
 
-# esptool: bawaan folder ini (Linux 64-bit), lalu yang terpasang di sistem.
-# Izin executable hilang jika folder diunduh sebagai ZIP dari GitHub.
-BUNDLED="$DIR/tools/esptool-linux-x64"
-[ -f "$BUNDLED" ] && [ ! -x "$BUNDLED" ] && chmod +x "$BUNDLED" 2>/dev/null || true
-
-if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ] && [ -x "$BUNDLED" ]; then
-    ESPTOOL=("$BUNDLED")
-elif command -v esptool >/dev/null 2>&1; then
-    ESPTOOL=(esptool)
-elif command -v esptool.py >/dev/null 2>&1; then
-    ESPTOOL=(esptool.py)
-elif python3 -c "import esptool" >/dev/null 2>&1; then
-    ESPTOOL=(python3 -m esptool)
-else
-    echo "esptool tidak ditemukan. Pasang dulu:  pip install esptool  (atau: pipx install esptool)"
+if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+    echo "upload.sh hanya untuk Linux 64-bit (x86_64)."
     exit 1
 fi
 
-# esptool v5 memakai write-flash / default-reset, v4 memakai write_flash / default_reset.
-MAJOR="$("${ESPTOOL[@]}" version 2>/dev/null | tail -n 1 | cut -d. -f1 | tr -dc '0-9')"
+# esptool bawaan folder ini. Izin executable hilang jika folder diunduh
+# sebagai ZIP dari GitHub.
+ESPTOOL="$DIR/tools/esptool-linux-x64"
 
-if [ "${MAJOR:-0}" -ge 5 ]; then
-    WRITE=write-flash; ERASE_CMD=erase-flash; BEFORE=default-reset; AFTER=hard-reset
-    MODE=--flash-mode; FREQ=--flash-freq; SIZE=--flash-size
-else
-    WRITE=write_flash; ERASE_CMD=erase_flash; BEFORE=default_reset; AFTER=hard_reset
-    MODE=--flash_mode; FREQ=--flash_freq; SIZE=--flash_size
+if [ ! -f "$ESPTOOL" ]; then
+    echo "File $ESPTOOL tidak ada. Salin ulang folder production lengkap."
+    exit 1
 fi
+
+[ -x "$ESPTOOL" ] || chmod +x "$ESPTOOL"
 
 if [ -z "$PORT" ]; then
     PORTS=()
-    for p in /dev/ttyUSB* /dev/ttyACM* /dev/cu.usbserial* /dev/cu.SLAB_USBtoUART* /dev/cu.wchusbserial*; do
+    for p in /dev/ttyUSB* /dev/ttyACM*; do
         [ -e "$p" ] && PORTS+=("$p")
     done
 
@@ -90,17 +78,33 @@ echo "== PORT: $PORT"
 
 if [ "$ERASE" -eq 1 ]; then
     echo "== HAPUS SEMUA ISI FLASH (WiFi, server, PIN kembali awal)"
-    "${ESPTOOL[@]}" --chip esp32 --port "$PORT" --baud "$BAUD" $ERASE_CMD
+    "$ESPTOOL" --chip esp32 --port "$PORT" --baud "$BAUD" erase-flash
 fi
 
+flash()
+{
+    "$ESPTOOL" --chip esp32 --port "$PORT" --baud "$1" \
+        --before default-reset --after hard-reset \
+        write-flash -z --flash-mode keep --flash-freq keep --flash-size keep \
+        0x1000  "$FW/bootloader.bin" \
+        0x8000  "$FW/partitions.bin" \
+        0xe000  "$FW/boot_app0.bin" \
+        0x10000 "$FW/firmware.bin"
+}
+
 echo "== UPLOAD"
-"${ESPTOOL[@]}" --chip esp32 --port "$PORT" --baud "$BAUD" \
-    --before $BEFORE --after $AFTER \
-    $WRITE -z $MODE keep $FREQ keep $SIZE keep \
-    0x1000  "$FW/bootloader.bin" \
-    0x8000  "$FW/partitions.bin" \
-    0xe000  "$FW/boot_app0.bin" \
-    0x10000 "$FW/firmware.bin"
+
+# Kabel panjang / murah bisa gagal di baud tinggi: ulangi sekali lebih pelan.
+if ! flash "$BAUD"; then
+    if [ "$BAUD" -le 115200 ]; then
+        echo "UPLOAD GAGAL. Cek kabel USB, lalu coba lagi."
+        exit 1
+    fi
+
+    echo
+    echo "== UPLOAD GAGAL DI $BAUD, DIULANG DENGAN 115200 (LEBIH LAMBAT)"
+    flash 115200 || { echo "UPLOAD GAGAL. Cek kabel USB, lalu coba lagi."; exit 1; }
+fi
 
 echo
 echo "SELESAI. ESP32 sudah restart dengan firmware baru."

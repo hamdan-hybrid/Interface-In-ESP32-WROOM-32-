@@ -13,18 +13,16 @@ sebagai `FIRMWARE:` di log saat boot dan di perintah `status`.
 
 | Folder / file | Isi |
 |---------------|-----|
-| `upload.sh` | Upload firmware dari Linux / macOS |
-| `upload.bat` | Upload firmware dari Windows |
+| `upload.sh` | Upload firmware (Linux) |
 | `firmware/` | File firmware (`*.bin`) dan `VERSI.txt` |
 | `sdcard/01/` | File suara `001.mp3` ... `009.mp3` untuk kartu SD modul MP3 |
-| `tools/` | esptool untuk Linux 64-bit (dipakai otomatis oleh `upload.sh`) |
+| `tools/` | esptool (dipakai otomatis oleh `upload.sh`) |
 
 ## Upload firmware
 
-Tidak perlu Arduino IDE. Yang dibutuhkan hanya kabel USB **data** (kabel yang hanya untuk
-charge tidak bisa dipakai).
-
-### Linux
+Upload dari komputer **Linux 64-bit** (Ubuntu, Debian, Mint, dll). Tidak perlu Arduino IDE
+dan tidak perlu memasang apa pun. Yang dibutuhkan hanya kabel USB **data** (kabel yang hanya
+untuk charge tidak bisa dipakai).
 
 Colokkan ESP32, buka terminal di folder ini, lalu jalankan:
 
@@ -32,21 +30,9 @@ Colokkan ESP32, buka terminal di folder ini, lalu jalankan:
 bash upload.sh
 ```
 
-Tunggu sampai muncul `SELESAI`, ESP32 restart sendiri. Tidak perlu memasang apa pun.
+Tunggu sampai muncul `SELESAI`, ESP32 restart sendiri.
 Jika muncul `Tidak punya izin ke /dev/ttyUSB0`, jalankan sekali
 `sudo usermod -aG dialout $USER`, lalu logout dan login lagi.
-
-### Windows
-
-1. Sekali saja: pasang Python dari https://www.python.org (centang **Add Python to PATH**),
-   lalu buka Command Prompt dan jalankan `pip install esptool`.
-2. Colokkan ESP32. Jika di Device Manager tidak muncul `Silicon Labs CP210x (COMx)`,
-   pasang driver CP210x dari situs Silicon Labs.
-3. Klik dua kali `upload.bat`, tunggu sampai muncul `SELESAI`.
-
-### macOS
-
-Sekali saja `pip3 install esptool`, lalu di Terminal: `bash upload.sh`.
 
 ### Pilihan upload
 
@@ -54,8 +40,8 @@ Sekali saja `pip3 install esptool`, lalu di Terminal: `bash upload.sh`.
 |----------|----------|
 | `bash upload.sh` | Update firmware. Setting WiFi, server, dan PIN Bluetooth **tetap**. |
 | `bash upload.sh --erase` | ESP32 **baru** / reset total. Semua setting terhapus, PIN kembali `123456`. |
-| `bash upload.sh /dev/ttyUSB1` | Pilih port jika ada lebih dari satu. Windows: `upload.bat COM5`. |
-| `BAUD=115200 bash upload.sh` | Upload sering gagal di tengah jalan. Windows: `set BAUD=115200` lalu `upload.bat`. |
+| `bash upload.sh /dev/ttyUSB1` | Pilih port jika ada lebih dari satu. |
+| `BAUD=115200 bash upload.sh` | Langsung upload pelan. Biasanya tidak perlu: jika gagal, `upload.sh` otomatis mengulang di 115200. |
 
 ### Jika gagal
 
@@ -64,8 +50,8 @@ Sekali saja `pip3 install esptool`, lalu di Terminal: `bash upload.sh`.
 | `ESP32 tidak terdeteksi` | Ganti kabel USB (harus kabel data), coba port USB lain. |
 | `Failed to connect` / `No serial data received` | Tahan tombol **BOOT** di ESP32 saat upload, lepas setelah muncul `Writing`. |
 | `This chip is ESP32-S3, not ESP32` (atau chip lain) | Board salah, firmware ini hanya untuk ESP32-WROOM-32. |
-| `esptool tidak ditemukan` | `pip install esptool`. |
-| Gagal saat `Writing` | Ulangi dengan `BAUD=115200`. |
+| `upload.sh hanya untuk Linux 64-bit` | Pakai laptop / PC Linux 64-bit. |
+| `UPLOAD GAGAL` (setelah diulang otomatis di 115200) | Ganti kabel USB yang lebih pendek / bagus, colok langsung ke laptop (tanpa hub USB). |
 | Karakter aneh `����` di Serial Monitor sesaat setelah restart | Normal, abaikan. |
 
 ## Setting pertama (Bluetooth)
@@ -92,6 +78,56 @@ Bluetooth (BLE) selalu aktif dan dilindungi PIN pairing 6 angka (awal `123456`).
 **Wajib ganti PIN dari `123456`.** Siapa pun yang tahu PIN bisa mengubah setting dan membuka
 palang lewat Bluetooth. Jika lupa PIN, sambungkan USB, lalu di Serial Monitor (115200)
 ketik `pin 654321`.
+
+## Daftar barang (1 unit)
+
+Loop detector (VLD) dan barrier gate sudah ada di lokasi, tidak termasuk daftar ini.
+
+**Modul utama**
+
+| Barang | Spesifikasi | Jumlah | Dipakai untuk |
+|--------|-------------|:------:|---------------|
+| ESP32 DevKit | chip **ESP32-WROOM-32**, USB CP2102 | 1 | otak sistem, WiFi, Bluetooth |
+| Modul step down | LM2596 DC-DC, 12V → **5,0V** (atur trimpot sebelum dipasang) | 2 | A: ESP32 + relay. B: modul MP3 + ampli |
+| Modul MP3 | Serial MP3 Player v1.1 (YX5300) + kartu microSD ≤ 32 GB (FAT32) | 1 | suara pengumuman |
+| Ampli | PAM8403 5V | 1 | penguat suara |
+| Speaker | 4–8 Ω, ±3 W | 1 | |
+| Modul relay | 1 channel 5V, ada jumper H/L | 1 | buka palang (jumper di **H**) |
+| Modul optocoupler | 4 channel, input 12V | 1 | status palang, VLD mobil, VLD motor |
+| Reader kartu | RFID 12V, output Wiegand 26/34 | 1 | kartu member (set ke Wiegand 34) |
+| Tombol | push button NO (tekan = nyambung) | 2 | tombol tiket, tombol bantuan |
+| Power supply | 12V 3A | 1 | catu daya semua |
+| Box project | plastik / ABS, ukuran secukupnya (semua modul, terminal, dan kabel muat) | 1 | wadah |
+
+**Komponen kecil**
+
+| Barang | Nilai | Jumlah | Dipakai untuk |
+|--------|-------|:------:|---------------|
+| Sekring + holder | 3A | 1 | pengaman +12V |
+| Dioda TVS | SMBJ15A | 1 | pengaman lonjakan +12V |
+| Elco | 470 µF 25V | 1 | terminal +12V |
+| Elco | 1000 µF 16V | 1 | filter LC modul MP3 |
+| Induktor | 100 µH, ≥ 1A | 1 | filter LC modul MP3 |
+| Kapasitor keramik | 100 nF | 3 | filter LC (1), tombol (2) |
+| Kapasitor keramik | 1 nF | 2 | Wiegand D0/D1 |
+| Resistor | 10k | 1 | GPIO2 → GND (relay mati saat boot) |
+| Resistor | 4k7 | 4 | pull-up tombol (2) dan Wiegand (2) |
+| Resistor | 1k | 2 | audio TX (seri) dan audio RX (pembagi) |
+| Resistor | 2k2 | 1 | audio RX (pembagi) |
+| Resistor | 330 Ω | 2 | seri tombol |
+| Dioda Schottky | BAT85 | 2 | Wiegand D0/D1 |
+| PCB lubang | kecil | 1 | rangkaian tombol dan Wiegand |
+| Terminal blok sekrup | | secukupnya | +12V, GND bintang, kabel keluar box |
+
+**Kabel (secukupnya)**
+
+| Kabel | Dipakai untuk |
+|-------|---------------|
+| Jumper female-female | ESP32 ke modul-modul di dalam box |
+| Kabel daya 2 core (±18 AWG) | PSU → terminal → step down |
+| UTP / FTP Cat5e (±3 m, sesuai jarak) | ke barrier: status palang dan relay buka |
+| Kabel twisted / shielded | ke reader kartu |
+| Kabel 2 core | ke tombol, VLD, dan speaker |
 
 ## Pin ESP32
 
