@@ -4,7 +4,7 @@ Firmware siap upload untuk **ESP32 DevKit (ESP32-WROOM-32)** sebagai interface p
 pintu masuk. Membaca loop detector (VLD) mobil/motor, tombol tiket, tombol bantuan, kartu member
 (reader Wiegand), dan status palang, lalu mengirim data ke server lewat WiFi. Server membuka
 palang dengan memanggil `http://IP-ESP32/open-gate?sn=SN` (relay aktif 1 detik). Suara lewat
-modul Serial MP3 Player v1.1 (YX5300) + ampli PAM8403. Setting dan log lewat Bluetooth (BLE).
+modul Serial MP3 Player v1.1 (YX5300) + speaker. Setting dan log lewat Bluetooth (BLE).
 
 Versi firmware: lihat [`firmware/VERSI.txt`](firmware/VERSI.txt). Versi yang terpasang tampil
 sebagai `FIRMWARE:` di log saat boot dan di perintah `status`.
@@ -88,15 +88,16 @@ Loop detector (VLD) dan barrier gate sudah ada di lokasi, tidak termasuk daftar 
 | Barang | Spesifikasi | Jumlah | Dipakai untuk |
 |--------|-------------|:------:|---------------|
 | ESP32 DevKit | chip **ESP32-WROOM-32**, USB CP2102 | 1 | otak sistem, WiFi, Bluetooth |
-| Modul step down | LM2596 DC-DC, 12V → **5,0V** (atur trimpot sebelum dipasang) | 2 | A: ESP32 + relay. B: modul MP3 + ampli |
+| Modul step down | LM2596 DC-DC, 12V → **5,0V** (atur trimpot sebelum dipasang) | 2 | A: ESP32 + relay. B: modul MP3 |
 | Modul MP3 | Serial MP3 Player v1.1 (YX5300) + kartu microSD ≤ 32 GB (FAT32) | 1 | suara pengumuman |
-| Ampli | PAM8403 5V | 1 | penguat suara |
-| Speaker | 4–8 Ω, ±3 W | 1 | |
+| Speaker | colokan jack 3,5 mm, ke output modul MP3 | 1 | suara pengumuman |
 | Modul relay | 1 channel 5V, ada jumper H/L | 1 | buka palang (jumper di **H**) |
 | Modul optocoupler | 4 channel, input 12V | 1 | status palang, VLD mobil, VLD motor |
 | Reader kartu | RFID 12V, output Wiegand 26/34 | 1 | kartu member (set ke Wiegand 34) |
 | Tombol | push button NO (tekan = nyambung) | 2 | tombol tiket, tombol bantuan |
-| Power supply | 12V 3A | 1 | catu daya semua |
+| Adaptor | 12V 3A | 1 | catu daya semua |
+| Socket DC | jack female sesuai colokan adaptor (umumnya 5,5 × 2,1 mm), dipasang di box | 1 | colokan adaptor ke box |
+| Kipas | 12V DC, ukuran sesuai box | 1 | pendingin di dalam box |
 | Box project | plastik / ABS, ukuran secukupnya (semua modul, terminal, dan kabel muat) | 1 | wadah |
 
 **Pengaman reader (wajib)**
@@ -113,10 +114,10 @@ Reader yang kami pakai mengeluarkan **5 V** di D0/D1, sedangkan pin ESP32 maksim
 | Barang | Dipakai untuk |
 |--------|---------------|
 | Kabel jumper female-female | ESP32 ke modul-modul di dalam box |
-| Kabel daya 2 core (±18 AWG) | PSU → terminal → step down |
+| Kabel daya 2 core (±18 AWG) | socket DC → terminal → step down dan kipas |
 | UTP / FTP Cat5e (±3 m, sesuai jarak) | ke barrier: status palang dan relay buka |
 | Kabel twisted / shielded | ke reader kartu |
-| Kabel 2 core | ke tombol, VLD, dan speaker |
+| Kabel 2 core | ke tombol dan VLD |
 | Terminal blok sekrup | +12V, GND bersama, kabel keluar box |
 
 Selain pengaman reader, resistor / kapasitor / elco lain **tidak wajib**: firmware memakai
@@ -141,7 +142,7 @@ Wiegand D0/D1 yang lewat pengaman reader.
 | 17  | Audio TX → RX modul MP3 | langsung |
 | 18  | Audio RX ← TX modul MP3 | langsung |
 | 3V3 | VCC sisi output modul opto | **bukan** 5V |
-| GND | GND semua modul | ESP32, step down, modul MP3, ampli, relay, opto, reader: GND jadi satu |
+| GND | GND semua modul | ESP32, step down, modul MP3, relay, opto, reader, kipas: GND jadi satu |
 
 Jangan dipakai: GPIO 1/3 (USB serial), 6–11 (flash), 0/12 (strapping boot), 34–39 (input
 saja, tanpa pull-up).
@@ -159,10 +160,10 @@ saja, tanpa pull-up).
 
 ### Daya
 
-- PSU 12V 3A → terminal +12V.
+- Adaptor 12V 3A → socket DC di box → terminal +12V.
 - Step down A (LM2596) diset 5,0 V → pin 5V ESP32 + DC+ modul relay.
-- Step down B (LM2596) diset 5,0 V → modul MP3 + ampli.
-- +12V langsung → reader, sisi input modul opto, COM kontak barrier, dan relay VLD.
+- Step down B (LM2596) diset 5,0 V → modul MP3.
+- +12V langsung → reader, sisi input modul opto, COM kontak barrier, relay VLD, dan kipas.
 - Semua GND ke satu terminal GND.
 
 Atur tegangan step down dengan multimeter **sebelum** disambung ke ESP32 / modul. Lebih dari
@@ -181,10 +182,9 @@ Atur tegangan step down dengan multimeter **sebelum** disambung ke ESP32 / modul
   200 ms (datang) / 500 ms (pergi), tombol 50 ms, status palang 100 ms, balasan modul MP3
   dicek formatnya.
 - GND semua modul wajib jadi satu. Kabel reader twisted / shielded.
-- Kabel audio dan speaker jauhkan dari kabel relay / loop. Volume modul MP3 maksimum,
-  gain (volume) ampli rendah agar desis kecil.
+- Kabel speaker jauhkan dari kabel relay / loop.
 - Jika karakter rusak `����` muncul di Serial Monitor saat alat sedang jalan, cek ground
-  antara USB laptop dan PSU 12V. Di lapangan pantau log lewat Bluetooth.
+  antara USB laptop dan adaptor 12V. Di lapangan pantau log lewat Bluetooth.
 
 ### Tambahan opsional
 
@@ -192,7 +192,7 @@ Tidak wajib. Pasang hanya jika ada masalah di lokasi, atau untuk unit yang ingin
 
 | Masalah / tujuan | Tambahan |
 |------------------|----------|
-| Pengaman kebakaran / korsleting | Sekring 3A + holder setelah PSU 12V (sangat disarankan, murah) |
+| Pengaman kebakaran / korsleting | Sekring 3A + holder setelah socket adaptor 12V (sangat disarankan, murah) |
 | Kartu kadang terbaca salah / `WIEGAND: ... NOISE` sering muncul | Kapasitor 1 nF dari GPIO21 dan GPIO22 ke GND |
 | Tombol kadang tertekan sendiri (kabel tombol panjang) | Per tombol: resistor 4k7 dari GPIO ke 3V3, resistor 330 Ω seri, kapasitor 100 nF ke GND |
 | Palang sempat bergerak sendiri saat ESP32 dinyalakan | Resistor 10k dari GPIO2 ke GND |
