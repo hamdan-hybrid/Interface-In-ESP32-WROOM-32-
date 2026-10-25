@@ -99,67 +99,61 @@ Loop detector (VLD) dan barrier gate sudah ada di lokasi, tidak termasuk daftar 
 | Power supply | 12V 3A | 1 | catu daya semua |
 | Box project | plastik / ABS, ukuran secukupnya (semua modul, terminal, dan kabel muat) | 1 | wadah |
 
-**Komponen kecil**
+**Kabel dan lain-lain (secukupnya)**
 
-| Barang | Nilai | Jumlah | Dipakai untuk |
-|--------|-------|:------:|---------------|
-| Sekring + holder | 3A | 1 | pengaman +12V |
-| Dioda TVS | SMBJ15A | 1 | pengaman lonjakan +12V |
-| Elco | 470 µF 25V | 1 | terminal +12V |
-| Elco | 1000 µF 16V | 1 | filter LC modul MP3 |
-| Induktor | 100 µH, ≥ 1A | 1 | filter LC modul MP3 |
-| Kapasitor keramik | 100 nF | 3 | filter LC (1), tombol (2) |
-| Kapasitor keramik | 1 nF | 2 | Wiegand D0/D1 |
-| Resistor | 10k | 1 | GPIO2 → GND (relay mati saat boot) |
-| Resistor | 4k7 | 4 | pull-up tombol (2) dan Wiegand (2) |
-| Resistor | 1k | 2 | audio TX (seri) dan audio RX (pembagi) |
-| Resistor | 2k2 | 1 | audio RX (pembagi) |
-| Resistor | 330 Ω | 2 | seri tombol |
-| Dioda Schottky | BAT85 | 2 | Wiegand D0/D1 |
-| PCB lubang | kecil | 1 | rangkaian tombol dan Wiegand |
-| Terminal blok sekrup | | secukupnya | +12V, GND bintang, kabel keluar box |
-
-**Kabel (secukupnya)**
-
-| Kabel | Dipakai untuk |
-|-------|---------------|
-| Jumper female-female | ESP32 ke modul-modul di dalam box |
+| Barang | Dipakai untuk |
+|--------|---------------|
+| Kabel jumper female-female | ESP32 ke modul-modul di dalam box |
 | Kabel daya 2 core (±18 AWG) | PSU → terminal → step down |
 | UTP / FTP Cat5e (±3 m, sesuai jarak) | ke barrier: status palang dan relay buka |
 | Kabel twisted / shielded | ke reader kartu |
 | Kabel 2 core | ke tombol, VLD, dan speaker |
+| Terminal blok sekrup | +12V, GND bersama, kabel keluar box |
+
+Resistor, kapasitor, elco, dan dioda **tidak wajib**: alat sudah berjalan tanpa itu, karena
+firmware memakai pull-up internal ESP32 dan memfilter noise sendiri. Lihat
+[Tambahan opsional](#tambahan-opsional) jika di lokasi ada gangguan.
 
 ## Pin ESP32
 
-Semua input aktif LOW (0 V saat aktif).
+Semua input aktif LOW (0 V saat aktif). Semua sambungan langsung (kabel jumper), tanpa resistor.
 
 | GPIO | Fungsi | Sambungan |
 |------|--------|-----------|
-| 2   | Relay palang | IN modul relay 5V (jumper **H**). HIGH = buka (pulsa 1 detik). Resistor 10k dari GPIO2 ke GND. |
+| 2   | Relay palang | IN modul relay 5V (jumper **H**). HIGH = buka (pulsa 1 detik) |
 | 4   | VLD mobil | OUT2 modul opto 4 channel 12V |
 | 5   | VLD motor | OUT3 modul opto |
 | 15  | Status palang | OUT1 modul opto. LOW = palang tertutup |
-| 25  | Tombol tiket | tombol ke GND, pull-up 4k7 ke 3V3, resistor 330 Ω seri, kapasitor 100 nF ke GND |
-| 26  | Tombol bantuan | sama dengan tombol tiket |
-| 21  | Wiegand D0 | dioda Schottky BAT85 (katoda ke kabel reader, anoda ke GPIO), pull-up 4k7 ke 3V3, kapasitor 1 nF ke GND |
-| 22  | Wiegand D1 | sama dengan D0 |
-| 17  | Audio TX → RX modul MP3 | lewat resistor 1k seri |
-| 18  | Audio RX ← TX modul MP3 | TX modul → 1k → GPIO18, lalu GPIO18 → 2k2 → GND |
+| 25  | Tombol tiket | satu kaki tombol ke GPIO25, kaki lain ke GND |
+| 26  | Tombol bantuan | satu kaki tombol ke GPIO26, kaki lain ke GND |
+| 21  | Wiegand D0 | kabel D0 reader (lihat catatan reader di bawah) |
+| 22  | Wiegand D1 | kabel D1 reader |
+| 17  | Audio TX → RX modul MP3 | langsung |
+| 18  | Audio RX ← TX modul MP3 | langsung |
 | 3V3 | VCC sisi output modul opto | **bukan** 5V |
+| GND | GND semua modul | ESP32, step down, modul MP3, ampli, relay, opto, reader: GND jadi satu |
 
 Jangan dipakai: GPIO 1/3 (USB serial), 6–11 (flash), 0/12 (strapping boot), 34–39 (input
 saja, tanpa pull-up).
 
-**Reader kartu:** set ke **Wiegand 34** (kabel abu-abu ke GND) agar nomor kartu utuh dan
-sama dengan reader USB. Wiegand 26 tetap terbaca, tapi byte teratas nomor kartu hilang.
+**Reader kartu:**
+- Set ke **Wiegand 34** (kabel abu-abu ke GND) agar nomor kartu utuh dan sama dengan
+  reader USB. Wiegand 26 tetap terbaca, tapi byte teratas nomor kartu hilang.
+- Pin ESP32 maksimal 3,3 V. Sebelum D0/D1 disambung ke ESP32, beri reader 12V lalu ukur
+  tegangan kabel D0 dan D1 ke GND dengan multimeter. Jika 0 V / sangat kecil (output
+  open-collector), boleh langsung. Jika **5 V atau 12 V**, wajib pakai dioda (lihat
+  [Tambahan opsional](#tambahan-opsional)), karena tanpa dioda pin ESP32 bisa rusak.
 
 ### Daya
 
-- PSU 12V 3A → sekring 3A → terminal +12V (TVS SMBJ15A + elco 470 µF ke GND).
-- Buck A LM2596 diset 5,0 V → pin 5V ESP32 + DC+ modul relay.
-- Buck B LM2596 diset 5,0 V → filter LC (100 µH + 1000 µF + 100 nF) → modul MP3 + ampli.
+- PSU 12V 3A → terminal +12V.
+- Step down A (LM2596) diset 5,0 V → pin 5V ESP32 + DC+ modul relay.
+- Step down B (LM2596) diset 5,0 V → modul MP3 + ampli.
 - +12V langsung → reader, sisi input modul opto, COM kontak barrier, dan relay VLD.
-- Semua GND ke satu terminal GND (ground bintang).
+- Semua GND ke satu terminal GND.
+
+Atur tegangan step down dengan multimeter **sebelum** disambung ke ESP32 / modul. Lebih dari
+5,5 V bisa merusak ESP32 dan modul MP3.
 
 ### Modul opto dan kabel barrier
 
@@ -170,14 +164,28 @@ sama dengan reader USB. Wiegand 26 tetap terbaca, tapi byte teratas nomor kartu 
 
 ### Anti-noise
 
-- Modul MP3: VCC dari buck terpisah + filter LC, elco 470–1000 µF + 100 nF dekat modul.
-  Volume modul maksimum, gain ampli rendah. Kabel audio jauh dari kabel relay / loop.
-- Reader: GND reader wajib sama dengan GND ESP32, kabel twisted / shielded. Jangan pakai
-  pembagi 1k/2k2 di D0/D1.
-- Firmware sudah memfilter: pulsa Wiegand < 15 µs / > 500 µs dibuang, VLD harus stabil
-  200 ms (datang) / 500 ms (pergi), tombol 50 ms, status palang 100 ms.
+- Firmware sudah memfilter noise: pulsa Wiegand < 15 µs / > 500 µs dibuang, VLD harus stabil
+  200 ms (datang) / 500 ms (pergi), tombol 50 ms, status palang 100 ms, balasan modul MP3
+  dicek formatnya.
+- GND semua modul wajib jadi satu. Kabel reader twisted / shielded.
+- Kabel audio dan speaker jauhkan dari kabel relay / loop. Volume modul MP3 maksimum,
+  gain (volume) ampli rendah agar desis kecil.
 - Jika karakter rusak `����` muncul di Serial Monitor saat alat sedang jalan, cek ground
   antara USB laptop dan PSU 12V. Di lapangan pantau log lewat Bluetooth.
+
+### Tambahan opsional
+
+Tidak wajib. Pasang hanya jika ada masalah di lokasi, atau untuk unit yang ingin lebih awet.
+
+| Masalah / tujuan | Tambahan |
+|------------------|----------|
+| Pengaman kebakaran / korsleting | Sekring 3A + holder setelah PSU 12V (sangat disarankan, murah) |
+| Tegangan D0/D1 reader 5 V / 12 V | Per jalur: dioda Schottky BAT85 (katoda ke kabel reader, anoda ke GPIO) + resistor 4k7 dari GPIO ke 3V3. **Wajib** untuk reader jenis ini |
+| Kartu kadang terbaca salah / `WIEGAND: ... NOISE` sering muncul | Kapasitor 1 nF dari GPIO21 dan GPIO22 ke GND |
+| Tombol kadang tertekan sendiri (kabel tombol panjang) | Per tombol: resistor 4k7 dari GPIO ke 3V3, resistor 330 Ω seri, kapasitor 100 nF ke GND |
+| Palang sempat bergerak sendiri saat ESP32 dinyalakan | Resistor 10k dari GPIO2 ke GND |
+| Suara berdengung / berdesis | Resistor 1k seri di GPIO17 → RX modul MP3. Filter LC di jalur 5V modul MP3: induktor 100 µH (≥ 1A) + elco 1000 µF 16V + kapasitor 100 nF |
+| Lonjakan tegangan di jalur 12V (lokasi banyak petir / motor besar) | Dioda TVS SMBJ15A + elco 470 µF 25V dari +12V ke GND |
 
 ## Kartu SD (modul MP3)
 
