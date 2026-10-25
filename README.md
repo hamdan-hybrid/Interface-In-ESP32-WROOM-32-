@@ -99,6 +99,15 @@ Loop detector (VLD) dan barrier gate sudah ada di lokasi, tidak termasuk daftar 
 | Power supply | 12V 3A | 1 | catu daya semua |
 | Box project | plastik / ABS, ukuran secukupnya (semua modul, terminal, dan kabel muat) | 1 | wadah |
 
+**Pengaman reader (wajib)**
+
+Reader yang kami pakai mengeluarkan **5 V** di D0/D1, sedangkan pin ESP32 maksimal 3,3 V.
+
+| Barang | Nilai | Jumlah | Dipakai untuk |
+|--------|-------|:------:|---------------|
+| Dioda Schottky | BAT85 (boleh 1N5819 / BAT43 / SS14) | 2 | D0 dan D1 |
+| Resistor | 4k7, ¼ W | 2 | pull-up D0 dan D1 ke 3V3 |
+
 **Kabel dan lain-lain (secukupnya)**
 
 | Barang | Dipakai untuk |
@@ -110,13 +119,14 @@ Loop detector (VLD) dan barrier gate sudah ada di lokasi, tidak termasuk daftar 
 | Kabel 2 core | ke tombol, VLD, dan speaker |
 | Terminal blok sekrup | +12V, GND bersama, kabel keluar box |
 
-Resistor, kapasitor, elco, dan dioda **tidak wajib**: alat sudah berjalan tanpa itu, karena
-firmware memakai pull-up internal ESP32 dan memfilter noise sendiri. Lihat
+Selain pengaman reader, resistor / kapasitor / elco lain **tidak wajib**: firmware memakai
+pull-up internal ESP32 dan memfilter noise sendiri. Lihat
 [Tambahan opsional](#tambahan-opsional) jika di lokasi ada gangguan.
 
 ## Pin ESP32
 
-Semua input aktif LOW (0 V saat aktif). Semua sambungan langsung (kabel jumper), tanpa resistor.
+Semua input aktif LOW (0 V saat aktif). Semua sambungan langsung (kabel jumper), kecuali
+Wiegand D0/D1 yang lewat pengaman reader.
 
 | GPIO | Fungsi | Sambungan |
 |------|--------|-----------|
@@ -126,8 +136,8 @@ Semua input aktif LOW (0 V saat aktif). Semua sambungan langsung (kabel jumper),
 | 15  | Status palang | OUT1 modul opto. LOW = palang tertutup |
 | 25  | Tombol tiket | satu kaki tombol ke GPIO25, kaki lain ke GND |
 | 26  | Tombol bantuan | satu kaki tombol ke GPIO26, kaki lain ke GND |
-| 21  | Wiegand D0 | kabel D0 reader (lihat catatan reader di bawah) |
-| 22  | Wiegand D1 | kabel D1 reader |
+| 21  | Wiegand D0 | kabel D0 reader → **katoda** dioda (sisi bergaris) → **anoda** ke GPIO21. Resistor 4k7 dari GPIO21 ke 3V3 |
+| 22  | Wiegand D1 | sama dengan D0: kabel D1 → katoda dioda → anoda ke GPIO22. Resistor 4k7 dari GPIO22 ke 3V3 |
 | 17  | Audio TX → RX modul MP3 | langsung |
 | 18  | Audio RX ← TX modul MP3 | langsung |
 | 3V3 | VCC sisi output modul opto | **bukan** 5V |
@@ -139,10 +149,13 @@ saja, tanpa pull-up).
 **Reader kartu:**
 - Set ke **Wiegand 34** (kabel abu-abu ke GND) agar nomor kartu utuh dan sama dengan
   reader USB. Wiegand 26 tetap terbaca, tapi byte teratas nomor kartu hilang.
-- Pin ESP32 maksimal 3,3 V. Sebelum D0/D1 disambung ke ESP32, beri reader 12V lalu ukur
-  tegangan kabel D0 dan D1 ke GND dengan multimeter. Jika 0 V / sangat kecil (output
-  open-collector), boleh langsung. Jika **5 V atau 12 V**, wajib pakai dioda (lihat
-  [Tambahan opsional](#tambahan-opsional)), karena tanpa dioda pin ESP32 bisa rusak.
+- Dioda menahan 5 V dari reader agar tidak masuk ke ESP32. Saat reader mengirim data
+  (kabel ditarik ke 0 V), dioda menghantar dan GPIO terbaca LOW. Tanpa dioda, pin ESP32
+  menerima 5 V terus-menerus dan bisa rusak pelan-pelan walaupun kartu tetap terbaca.
+- Cek setelah dipasang: tegangan GPIO21 dan GPIO22 ke GND saat diam harus ±3,3 V (bukan
+  5 V), dan tap kartu harus muncul `KARTU: ...` di log dengan nomor yang sama seperti sebelumnya.
+- Reader merek lain: ukur dulu kabel D0/D1 ke GND (reader diberi 12V, D0/D1 belum ke
+  ESP32). 5 V / 12 V → pakai pengaman ini. 0 V (open-collector) → boleh langsung, tanpa dioda.
 
 ### Daya
 
@@ -180,7 +193,6 @@ Tidak wajib. Pasang hanya jika ada masalah di lokasi, atau untuk unit yang ingin
 | Masalah / tujuan | Tambahan |
 |------------------|----------|
 | Pengaman kebakaran / korsleting | Sekring 3A + holder setelah PSU 12V (sangat disarankan, murah) |
-| Tegangan D0/D1 reader 5 V / 12 V | Per jalur: dioda Schottky BAT85 (katoda ke kabel reader, anoda ke GPIO) + resistor 4k7 dari GPIO ke 3V3. **Wajib** untuk reader jenis ini |
 | Kartu kadang terbaca salah / `WIEGAND: ... NOISE` sering muncul | Kapasitor 1 nF dari GPIO21 dan GPIO22 ke GND |
 | Tombol kadang tertekan sendiri (kabel tombol panjang) | Per tombol: resistor 4k7 dari GPIO ke 3V3, resistor 330 Ω seri, kapasitor 100 nF ke GND |
 | Palang sempat bergerak sendiri saat ESP32 dinyalakan | Resistor 10k dari GPIO2 ke GND |
